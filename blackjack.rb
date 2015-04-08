@@ -210,12 +210,12 @@ class Game
     if @human_players.all? { |p| p.bust }
       # dealer win
       # no need to take card for him
-      end_session
+      return end_session
     end
 
     # there is no playable human on this game
     if @human_players.all? { |p| !p.playable? }
-      dealer_turn
+      return dealer_turn
     end
   end
 
