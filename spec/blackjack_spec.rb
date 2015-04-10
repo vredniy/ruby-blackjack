@@ -11,7 +11,7 @@ describe 'Card' do
     end
 
     context 'false when opened set to false' do
-      subject { Card.new(50, false) }
+      subject { Card.new(50).close! }
 
       it { expect(subject.opened?).to be false }
     end
@@ -88,7 +88,7 @@ describe 'Hand' do
 
     context '2 cards' do
       before do
-        @hand.push Card.new(38, false) # Ace of Clubs
+        @hand.push Card.new(38) # Ace of Clubs
         @hand.push Card.new(21) # 10 of Hearts
       end
 
@@ -107,10 +107,9 @@ describe 'Hand' do
 
     context 'for some cards' do
       before do
-        
         @hand.push Card.new(20) # 9 hearts
         @hand.push Card.new(4) # 6 diamonds
-        @hand.push Card.new(50, false) # KING spades
+        @hand.push Card.new(50) # KING spades
       end
 
       it { expect(subject).to eq 25 }
@@ -118,7 +117,46 @@ describe 'Hand' do
   end
 end
 
+describe 'Deck' do
+  describe 'initialization' do
+    subject { Deck.new }
 
+    it { expect(subject.cards.size).to eq 52 }
+
+    # 2, 2, 2, 2, 3, 3, 3, 3 ... 11
+    it { expect(subject.cards.map(&:weight).sort.inject(:+)).to eq 380 }
+  end
+
+  describe '#get_one' do
+    context 'just card' do
+      subject { Deck.new.get_one }
+
+      it { expect(subject).to be_an_instance_of Card }
+      it { expect(subject.opened?).to be true }
+    end
+
+    context 'closed' do
+      subject { Deck.new.get_one(false) }
+
+      it { expect(subject).to be_an_instance_of Card }
+      it { expect(subject.opened?).to be false }
+    end
+
+    context '52 times' do
+      subject { @deck.cards }
+
+      before do
+        @deck = Deck.new
+        52.times { @deck.get_one }
+      end
+
+      it { expect(subject).to eq [] }
+      it do
+        expect { @deck.get_one }.to raise_error(Exception, 'Not enough cards')
+      end
+    end
+  end
+end
 
 describe Player do
   describe 'initialization' do
@@ -129,15 +167,56 @@ describe Player do
     it { expect(subject.hand).to be_an_instance_of Hand }
   end
 
-  # describe '#take_card' do
-  #   before { @game = Game.new }
-  #   subject { Player.new.take_card(@game) }
-  #
-  #   it do
-  #     expect(Game).to receive(:new).and_call_original
-  #     subject
-  #   end
-  # end
+  describe '#check_value' do
+    subject { @player.check_value }
+
+    context '> 21' do
+      before do
+        hand_double = double('hand')
+        allow(Hand).to receive(:new).and_return hand_double
+        expect(hand_double).to receive(:value) { 22 }
+
+        @player = Player.new
+
+        subject
+      end
+
+      it { expect(@player.bust).to be true }
+      it { expect(@player.playable).to be false }
+    end
+
+    context '<= 21' do
+      before do
+        hand_double = double('hand')
+        allow(Hand).to receive(:new).and_return hand_double
+        expect(hand_double).to receive(:value) { 21 }
+
+        @player = Player.new
+
+        subject
+      end
+
+      it { expect(@player.bust).to be false }
+      it { expect(@player.playable).to be true }
+    end
+  end
+
+  describe HumanPlayer do
+    it { expect(subject).to be_a_kind_of Player }
+
+    describe '#make_bet' do
+      subject { @human_player.current_bet }
+
+      before { @human_player = HumanPlayer.new }
+      before { @human_player.make_bet 42 }
+
+      it { expect(subject).to eq 42 }
+    end
+  end
+
+  describe DealerPlayer do
+    it { expect(subject).to be_a_kind_of Player }
+  end
 end
 
 describe Game do
@@ -173,7 +252,7 @@ describe Game do
 
           expect(game.human_players[0].hand.cards.map &:to_s).to eq %w(2D 2H)
 
-          game.dealer_player.hand.cards = [Card.new(8), Card.new(9, false)]
+          game.dealer_player.hand.cards = [Card.new(8), Card.new(9)]
 
           game.human_players[0].split_hand(game)
 
@@ -182,14 +261,14 @@ describe Game do
           expect(game.human_players[1].hand.cards[0].to_s).to eq '2H'
 
           game.human_players[1].hand.cards = [Card.new(12), Card.new(25)]
+          game.human_players[1].check_value
 
-          game.end_session
+          expect(game.end_session).to match /Dealer won/
 
-          expect(game.result).to eq '5) 1 human won'
-
-          expect(game.human_money).to eq 1000
+          expect(game.human_money).to eq 500
         end
       end
+
       context 'dealer won' do
         it do
           game = Game.new
@@ -199,7 +278,7 @@ describe Game do
 
           expect(game.human_players[0].hand.cards.map &:to_s).to eq %w(2D 2H)
 
-          game.dealer_player.hand.cards = [Card.new(8), Card.new(9, false)]
+          game.dealer_player.hand.cards = [Card.new(8), Card.new(9)]
 
           game.human_players[0].split_hand(game)
 
@@ -207,9 +286,7 @@ describe Game do
           expect(game.human_players[0].hand.cards[0].to_s).to eq '2D'
           expect(game.human_players[1].hand.cards[0].to_s).to eq '2H'
 
-          game.end_session
-
-          expect(game.result).to eq '6) dealer won'
+          expect(game.end_session).to match /Dealer won/
 
           expect(game.human_money).to eq 500
         end
@@ -222,15 +299,13 @@ describe Game do
 
           game.human_players[0].hand.cards = [Card.new(1), Card.new(25)]
 
-          game.dealer_player.hand.cards = [Card.new(2), Card.new(3, false)]
+          game.dealer_player.hand.cards = [Card.new(2), Card.new(3).close!]
 
           game.human_players[0].split_hand(game)
 
           expect(game.human_players.size).to eq 2
 
-          game.end_session
-
-          expect(game.result).to eq '5) 1 human won'
+          expect(game.end_session).to match /1 Human won/
 
           expect(game.human_money).to eq 1000
         end
@@ -243,16 +318,14 @@ describe Game do
 
           game.human_players[0].hand.cards = [Card.new(12), Card.new(25)]
 
-          game.dealer_player.hand.cards = [Card.new(2), Card.new(3, false)]
+          game.dealer_player.hand.cards = [Card.new(2), Card.new(3).close!]
 
           game.human_players[0].split_hand(game)
           game.human_players[1].double_bet(game)
 
           expect(game.human_players.size).to eq 2
 
-          game.end_session
-
-          expect(game.result).to eq '7) 2 humans won'
+          expect(game.end_session).to match /2 Humans won/
 
           expect(game.human_money).to eq 1750
         end
@@ -266,12 +339,10 @@ describe Game do
           game.make_bet(100)
           game.dealer_player.bust = true
 
-
-          game.end_session
+          expect(game.end_session).to match /Human won/
 
           expect(game.finished).to eq true
           expect(game.human_money).to eq 1100
-          expect(game.result).to eq '1) human won'
         end
       end
 
@@ -281,11 +352,10 @@ describe Game do
           game.make_bet(500)
           game.human_players[0].bust = true
 
-          game.end_session
+          expect(game.end_session).to match /Dealer won/
 
           expect(game.finished).to eq true
           expect(game.human_money).to eq 500
-          expect(game.result).to eq '2) dealer won'
         end
       end
 
@@ -297,43 +367,13 @@ describe Game do
           game.human_players[0].hand.cards = [Card.new(0), Card.new(1), Card.new(2)]
           game.dealer_player.hand.cards = [Card.new(8), Card.new(9)]
 
-          game.end_session
+          expect(game.end_session).to match /Dealer won/
 
           expect(game.finished).to eq true
           expect(game.human_money).to eq 970
-          expect(game.result).to eq '4) dealer won'
         end
       end
     end
   end
 end
 
-describe 'Deck' do
-  describe 'initialization' do
-    subject { Deck.new }
-
-    it { expect(subject.cards.size).to eq 52 }
-
-    # 2, 2, 2, 2, 3, 3, 3, 3 ... 11
-    it { expect(subject.cards.map(&:weight).sort.inject(:+)).to eq 380 }
-  end
-
-  describe '#get_one' do
-    context 'just card' do
-      subject { Deck.new.get_one }
-
-      it { expect(subject).to be_an_instance_of Card }
-    end
-
-    context '52 times' do
-      subject { @deck.cards }
-
-      before do
-        @deck = Deck.new
-        52.times { @deck.get_one }
-      end
-
-      it { expect(subject).to eq [] }
-    end
-  end
-end

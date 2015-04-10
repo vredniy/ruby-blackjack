@@ -7,25 +7,25 @@
   <h2>current money = <%= game.human_money %> (finished = <%= game.finished %>)</h2>
   <% if game.finished %>
     <h3>Game finished</h3>
-    <h4>Game result = <%= game.result %></h4>
+    <h4>Game result = <span style="color: red"><%= game.result %></span></h4>
   <% end %>
 
   dealer hand value: <b><%= game.dealer_player.hand.value %></b>
-<br />
-dealer cards:
+  <br />
+  dealer cards:
   <ul>
     <% game.dealer_player.hand.cards.each do |card| %>
-          <li>
-            <% if card.opened? %>
-              <%= card %>
-            <% else %>
-              <% if game.finished %>
-                <%= card %>
-              <% else %>
-                **
-              <% end %>
-            <% end %>
-          </li>
+      <li>
+        <% if card.opened? %>
+          <%= card %>
+        <% else %>
+          <% if game.finished %>
+            <%= card %>
+          <% else %>
+            **
+          <% end %>
+        <% end %>
+      </li>
     <% end %>
   </ul>
 
@@ -36,8 +36,8 @@ dealer cards:
       </li>
       <li>
         playable: <%= hp.playable %>
-        <br />
-        hand value: <b><%= hp.hand.value %></b>
+      <br />
+      hand value: <b><%= hp.hand.value %></b>
       <br />
       cards:
       <ul>
@@ -51,13 +51,16 @@ dealer cards:
         <% if hp.playable? %>
           <a href="/<%= index %>/take_card">/take_card</a><br />
           <a href="/<%= index %>/stay">/stay</a><br />
-          <a href="/<%= index %>/split_hand">/split_hand</a><br />
+
+          <% if game.human_players.size < 2 %>
+            <a href="/<%= index %>/split_hand">/split_hand</a><br />
+          <% end %>
+
           <a href="/<%= index %>/double_bet">/double_bet</a>
         <% end %>
       </ul>
-    </li>
-  <% end %>
-</ul>
+    <% end %>
+  </ul>
 <% end %>
 
 <form action="/make_bet" method="post">

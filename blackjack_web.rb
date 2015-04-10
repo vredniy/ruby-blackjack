@@ -9,52 +9,28 @@ helpers do
   end
 
   def game
-    if session[:game]
-      Marshal.load(session[:game])
-    else
-      g = Game.new
-      session[:game] = Marshal.dump(g)
-      g
+    unless session[:game]
+      save_game(Game.new)
     end
+
+    Marshal.load(session[:game])
   end
-end
 
-get '/:player_id/stay' do
-  g = game
-  g.make_move(params[:player_id], 'stay')
-  save_game(g)
-
-  redirect '/'
-end
-
-
-get '/:player_id/double_bet' do
-  g = game
-  g.make_move(params[:player_id], 'double_bet')
-  save_game(g)
-
-  redirect '/'
-end
-
-
-get '/:player_id/take_card' do
-  g = game
-  g.make_move(params[:player_id], 'take_card')
-  save_game(g)
-
-  redirect '/'
-end
-
-get '/:player_id/split_hand' do
-  g = game
-  g.make_move(params[:player_id], 'split_hand')
-  save_game(g)
-
-  redirect '/'
+  def make_move(player_id, move)
+    g = game
+    g.make_move(params[:player_id], move)
+    save_game(g)
+  end
 end
 
 get '/' do
   erb :mainpage
+end
+
+get '/:player_id/:move' do
+  make_move(params[:player_id], params[:move])
+
+  redirect '/'
 end
 
 get '/new_game' do
@@ -65,12 +41,7 @@ end
 
 post '/make_bet' do
   g = game
-
-  bet = params[:bet].to_i
-
-  g.make_bet(bet)
-  # g.make_move(0, 'make_bet', bet)
-
+  g.make_bet(params[:bet].to_i)
   save_game(g)
 
   redirect '/'
